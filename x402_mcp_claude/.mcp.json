@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "x402-weather": {
+      "command": "pnpm",
+      "args": [
+        "--silent",
+        "-C",
+        "C:/Users/Aldrin/Desktop/pay2/x402_mcp_claude/examples/typescript/mcp",
+        "dev"
+      ],
+      "env": {
+        "PRIVATE_KEY": "0xdb24d7bc95ef641e49be186b5b93bcbb70f65cb2bf3e99b5a9c39a84d09b867b",
+        "RESOURCE_SERVER_URL": "http://localhost:4021",
+        "ENDPOINT_PATH": "/weather"
+      }
+    }
+  }
+}

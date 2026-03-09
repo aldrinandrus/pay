@@ -1,0 +1,18 @@
+{
+  "mcp.servers": {
+    "x402-weather": {
+      "command": "pnpm",
+      "args": [
+        "--silent",
+        "-C",
+        "/home/senku/code/x402/examples/typescript/mcp",
+        "dev"
+      ],
+      "env": {
+        "PRIVATE_KEY": "0x7b0c74e4500b02a3b0dae2a8d6ec9fbf84d1c42eb06ca2e16b9ba197bad8a2e5",
+        "RESOURCE_SERVER_URL": "http://localhost:4021",
+        "ENDPOINT_PATH": "/weather"
+      }
+    }
+  }
+}
