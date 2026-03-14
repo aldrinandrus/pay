@@ -11,11 +11,11 @@ import { PaymentRequirements, UnsignedPaymentPayload } from "../types/verify";
  * @param paymentRequirements - The payment requirements containing scheme and network information
  * @returns An unsigned payment payload that can be used to create a payment header
  */
-export function preparePaymentHeader(
+export async function preparePaymentHeader(
   from: Address,
   x402Version: number,
   paymentRequirements: PaymentRequirements,
-): UnsignedPaymentPayload {
+): Promise<UnsignedPaymentPayload> {
   if (
     paymentRequirements.scheme === "exact" &&
     SupportedEVMNetworks.includes(paymentRequirements.network)

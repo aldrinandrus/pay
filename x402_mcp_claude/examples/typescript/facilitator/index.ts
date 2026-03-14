@@ -77,8 +77,18 @@ app.post("/verify", async (req: Request, res: Response) => {
       throw new Error("Invalid network");
     }
 
+    // debug log the authorization before verifying
+    console.log("Verify request authorization:", paymentPayload.payload.authorization);
+    // also log chain time if EVM
+    if (SupportedEVMNetworks.includes(paymentRequirements.network)) {
+      const rpcClient = createConnectedClient(paymentRequirements.network);
+      const bn = await rpcClient.getBlockNumber();
+      const block = await rpcClient.getBlock({ blockNumber: bn });
+      console.log("Verify chain block", bn.toString(), "ts", block.timestamp);
+    }
     // verify
     const valid = await verify(client, paymentPayload, paymentRequirements, x402Config);
+    console.log("Verify result:", valid);
     res.json(valid);
   } catch (error) {
     console.error("error", error);
@@ -139,6 +149,12 @@ app.post("/settle", async (req: Request, res: Response) => {
       validAfter: paymentPayload.payload.authorization.validAfter,
       validBefore: paymentPayload.payload.authorization.validBefore,
     });
+    if (SupportedEVMNetworks.includes(paymentRequirements.network)) {
+      const rpcClient = createConnectedClient(paymentRequirements.network);
+      const bn = await rpcClient.getBlockNumber();
+      const block = await rpcClient.getBlock({ blockNumber: bn });
+      console.log("Settle chain block", bn.toString(), "ts", block.timestamp);
+    }
 
     // use the correct private key based on the requested network
     let signer: Signer;

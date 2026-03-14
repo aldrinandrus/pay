@@ -4,6 +4,7 @@ import { PaymentRequirements, UnsignedPaymentPayload } from "../../../types/veri
 import { createPaymentHeader, preparePaymentHeader, signPaymentHeader } from "./client";
 import { signAuthorization } from "./sign";
 import { encodePayment } from "./utils/paymentUtils";
+import * as evmRpc from "../../../shared/evm/rpc";
 
 vi.mock("./sign", async () => {
   const actual = await vi.importActual("./sign");
@@ -37,15 +38,19 @@ describe("preparePaymentHeader", () => {
     // Set a fixed time for consistent testing
     vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));
     vi.clearAllMocks();
+
+    // mock rpc client so we control chain timestamp
+    const mockRpc = { getBlock: vi.fn().mockResolvedValue({ timestamp: 1700000000 }) };
+    vi.spyOn(evmRpc, "createEvmRpcClient").mockReturnValue(mockRpc as any);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("should create a valid unsigned payment header", () => {
-    const result = preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
-    const currentTime = Math.floor(Date.now() / 1000);
+  it("should create a valid unsigned payment header", async () => {
+    const result = await preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
+    const currentTime = 1700000000; // comes from mocked rpc timestamp
 
     expect(result).toEqual({
       x402Version: 1,
@@ -65,34 +70,50 @@ describe("preparePaymentHeader", () => {
     });
   });
 
-  it("should generate a unique nonce for each call", () => {
-    const result1 = preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
-    const result2 = preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
+  it("should generate a unique nonce for each call", async () => {
+    const result1 = await preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
+    const result2 = await preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
 
     expect(result1.payload.authorization.nonce.length).toBe(66);
     expect(result2.payload.authorization.nonce.length).toBe(66);
     expect(result1.payload.authorization.nonce).not.toBe(result2.payload.authorization.nonce);
   });
 
-  it("should calculate validAfter as 60 seconds before current time", () => {
-    const result = preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
-    const currentTime = Math.floor(Date.now() / 1000);
+  it("should calculate validAfter as 60 seconds before current time", async () => {
+    const result = await preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
+    const currentTime = 1700000000;
     const validAfter = parseInt(result.payload.authorization.validAfter);
 
     expect(validAfter).toBe(currentTime - 600);
   });
 
-  it("should calculate validBefore as current time plus maxTimeoutSeconds", () => {
-    const result = preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
-    const currentTime = Math.floor(Date.now() / 1000);
+  it("should calculate validBefore as current time plus maxTimeoutSeconds", async () => {
+    const result = await preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
+    const currentTime = 1700000000;
     const validBefore = parseInt(result.payload.authorization.validBefore);
 
     expect(validBefore).toBe(currentTime + mockPaymentRequirements.maxTimeoutSeconds);
   });
 
-  it("should handle different x402 versions", () => {
-    const result = preparePaymentHeader(mockFromAddress, 2, mockPaymentRequirements);
+  it("should handle different x402 versions", async () => {
+    const result = await preparePaymentHeader(mockFromAddress, 2, mockPaymentRequirements);
     expect(result.x402Version).toBe(2);
+  });
+
+  it("should fall back to system time if chain timestamp is ahead and extend expiration", async () => {
+    // simulate chain returning a time far in the future
+    const farFuture = 2000000000;
+    vi.mocked(evmRpc.createEvmRpcClient).mockReturnValue({
+      getBlock: vi.fn().mockResolvedValue({ timestamp: farFuture }),
+    } as any);
+    const result = await preparePaymentHeader(mockFromAddress, 1, mockPaymentRequirements);
+    const currentTime = Math.floor(Date.now() / 1000);
+    // validAfter should be based on the (smaller) system clock
+    expect(result.payload.authorization.validAfter).toBe((currentTime - 600).toString());
+    // because the chain is far ahead, validBefore should be pushed out to include
+    // the current chain time rather than using systemNow + timeout
+    const expectedBefore = farFuture + mockPaymentRequirements.maxTimeoutSeconds;
+    expect(result.payload.authorization.validBefore).toBe(expectedBefore.toString());
   });
 });
 

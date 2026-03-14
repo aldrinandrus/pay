@@ -1,5 +1,6 @@
 import { Address, Chain, LocalAccount, Transport } from "viem";
 import { isSignerWallet, SignerWallet } from "../../../types/shared/evm";
+import { createEvmRpcClient } from "../../../shared/evm/rpc";
 import { PaymentPayload, PaymentRequirements, UnsignedPaymentPayload } from "../../../types/verify";
 import { createNonce, signAuthorization } from "./sign";
 import { encodePayment } from "./utils/paymentUtils";
@@ -12,18 +13,51 @@ import { encodePayment } from "./utils/paymentUtils";
  * @param paymentRequirements - The payment requirements containing scheme and network information
  * @returns An unsigned payment payload containing authorization details
  */
-export function preparePaymentHeader(
+export async function preparePaymentHeader(
   from: Address,
   x402Version: number,
   paymentRequirements: PaymentRequirements,
-): UnsignedPaymentPayload {
+): Promise<UnsignedPaymentPayload> {
   const nonce = createNonce();
 
-  const validAfter = BigInt(1).toString();
-  // Set validBefore to 365 days in the future to ensure authorization never expires
-  const validBefore = BigInt(
-    Math.floor(Date.now() / 1000 + 365 * 24 * 60 * 60),
-  ).toString();
+  // determine current time using both system clock and blockchain timestamp.
+  // choose the minimum of the two so we never generate a validAfter in the future
+  const systemNow = Math.floor(Date.now() / 1000);
+  let chainNow = systemNow;
+  try {
+    const rpcClient = createEvmRpcClient(paymentRequirements.network);
+    const block = await rpcClient.getBlock({ blockTag: "latest" });
+    if (block && block.timestamp !== undefined) {
+      chainNow = Number(block.timestamp);
+    }
+  } catch (err) {
+    // ignore errors, we'll fallback to system time
+  }
+  // start from the earliest clock we trust (system or chain) so that
+  // validAfter never lies in the future for either clock.  We also apply
+  // a small negative buffer to account for slight drift.  This choice keeps
+  // the authorization valid when the resource server checks it using its own
+  // local time (system clock).  However, if the blockchain has progressed far
+  // beyond "now", simply using this base window could result in the entire
+  // authorization being in the past on-chain, causing settlement to revert
+  // with "authorization is expired".  To avoid that we make sure the end of
+  // the window extends at least to the current chain timestamp.
+  const now = Math.min(systemNow, chainNow);
+
+  const bufferSeconds = 600; // keep the validAfter slightly in the past
+  let validAfterNumber = now - bufferSeconds;
+  let validBeforeNumber = now + paymentRequirements.maxTimeoutSeconds;
+
+  // if the chain has already moved past the naive window, extend the
+  // expiration so that the current block time is included.  We leave the
+  // start of the window as system-based (minimum clock) to satisfy resource
+  // servers that may compare against local time.
+  if (chainNow > validBeforeNumber) {
+    validBeforeNumber = chainNow + paymentRequirements.maxTimeoutSeconds;
+  }
+
+  const validAfter = BigInt(validAfterNumber).toString();
+  const validBefore = BigInt(validBeforeNumber).toString();
 
   return {
     x402Version,
@@ -85,7 +119,7 @@ export async function createPayment<transport extends Transport, chain extends C
   paymentRequirements: PaymentRequirements,
 ): Promise<PaymentPayload> {
   const from = isSignerWallet(client) ? client.account!.address : client.address;
-  const unsignedPaymentHeader = preparePaymentHeader(from, x402Version, paymentRequirements);
+  const unsignedPaymentHeader = await preparePaymentHeader(from, x402Version, paymentRequirements);
   return signPaymentHeader(client, paymentRequirements, unsignedPaymentHeader);
 }
 

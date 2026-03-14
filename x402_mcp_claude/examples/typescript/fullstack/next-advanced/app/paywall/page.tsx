@@ -1,7 +1,7 @@
 "use client";
 
 import { Wallet } from "@coinbase/onchainkit/wallet";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { verifyPayment } from "../actions";
 import { PaymentRequirements, PaymentPayload } from "x402/types";
 import { preparePaymentHeader } from "x402/client";
@@ -27,11 +27,17 @@ function PaymentForm({
     );
   }
 
-  const unSignedPaymentHeader = preparePaymentHeader(
-    address,
-    1,
-    paymentRequirements
-  );
+  const [unSignedPaymentHeader, setUnSignedPaymentHeader] = useState<PaymentPayload | null>(null);
+
+  // prepare header once address or paymentRequirements change
+  useEffect(() => {
+    let canceled = false;
+    (async () => {
+      const hdr = await preparePaymentHeader(address, 1, paymentRequirements);
+      if (!canceled) setUnSignedPaymentHeader(hdr);
+    })();
+    return () => { canceled = true; };
+  }, [address, paymentRequirements]);
 
   const eip712Data = {
     types: {
@@ -51,7 +57,7 @@ function PaymentForm({
       verifyingContract: paymentRequirements.asset as `0x${string}`,
     },
     primaryType: "TransferWithAuthorization" as const,
-    message: unSignedPaymentHeader.payload.authorization,
+    message: unSignedPaymentHeader?.payload.authorization,
   };
 
   async function handlePayment() {

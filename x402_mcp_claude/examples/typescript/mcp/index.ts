@@ -27,6 +27,19 @@ const account = privateKeyToAccount(privateKey);
 
 const client = withPaymentInterceptor(axios.create({ baseURL }), account);
 
+// log outgoing headers and any errors for debugging
+client.interceptors.request.use(req => {
+  console.log("[mcp] outgoing headers", req.headers);
+  return req;
+});
+client.interceptors.response.use(
+  res => res,
+  err => {
+    console.error("[mcp] response error", err.response?.status, err.response?.data, err.config?.headers);
+    return Promise.reject(err);
+  }
+);
+
 // Create an MCP server
 const server = new McpServer({
   name: "x402 MCP Client Demo",
