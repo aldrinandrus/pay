@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --nb-bg: #fdfcee; /* Yellowish grid background from original reference */
+  --nb-ink: #111827; /* Dark ink color */
+}
+
+@theme inline {
+  --color-background: var(--nb-bg);
+  --color-foreground: var(--nb-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  font-family: var(--font-geist-sans);
+  background-color: var(--nb-bg);
+  color: var(--nb-ink);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  user-select: auto !important;
+  background-image: 
+    linear-gradient(to right, #ecebde 1px, transparent 1px),
+    linear-gradient(to bottom, #ecebde 1px, transparent 1px);
+  background-size: 35px 35px;
+}
+
+/* Neo-Brutalism Utility Class */
+.brutal-shadow {
+  box-shadow: 5px 5px 0px 0px rgba(0,0,0,1);
+}
+.brutal-border {
+  border-width: 3px;
+  border-style: solid;
+  border-color: #000;
+}
