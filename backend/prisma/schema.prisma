@@ -1,0 +1,36 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  wallet_address  String
+  model           String
+  prompt          String
+  response        String
+  input_tokens    Int
+  output_tokens   Int
+  cost            Float
+  status          String   // "pending", "completed", "failed"
+  created_at      DateTime @default(now())
+
+  @@map("transactions")
+  @@index([wallet_address])
+}
+
+model WalletBalance {
+  wallet_address  String   @id
+  spending_cap    Float
+  current_balance Float
+  last_updated    DateTime @updatedAt
+
+  @@map("wallet_balances")
+}
