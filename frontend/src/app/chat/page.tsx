@@ -8,8 +8,6 @@ import { Send, Bot, User, Loader2, Coins, ChevronDown, ArrowLeft, AlertCircle } 
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 
-const API_URL = 'http://localhost:3001';
-
 const MODELS = [
   { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
   { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI' },
@@ -18,6 +16,8 @@ const MODELS = [
   { id: 'gemini-pro', name: 'Gemini Pro', provider: 'Google' },
   { id: 'mistral-large', name: 'Mistral Large', provider: 'Mistral' },
 ];
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 type ChatMessage = {
   id: string;
@@ -40,6 +40,7 @@ export default function ChatApp() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [balances, setBalances] = useState<{ spending_cap: string, current_balance: string } | null>(null);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +52,14 @@ export default function ChatApp() {
     if (isConnected && chain && chain.id !== baseSepolia.id && switchChain) {
       switchChain({ chainId: baseSepolia.id });
     }
-  }, [isConnected, chain, switchChain]);
+    
+    if (isConnected && address) {
+      fetch(`${API_URL}/api/balance/${address}`)
+        .then(res => res.json())
+        .then(data => setBalances(data))
+        .catch(e => console.error("Balance fetch failed", e));
+    }
+  }, [isConnected, chain, switchChain, address]);
 
   useEffect(() => {
     const handler = setTimeout(async () => {
@@ -156,8 +164,9 @@ export default function ChatApp() {
 
       setMessages((prev) => prev.map(m => m.id === aiMsgId ? { ...m, isStreaming: false } : m));
 
-    } catch (err: any) {
-      setMessages((prev) => prev.map(m => m.id === aiMsgId ? { ...m, content: err.message, isStreaming: false, error: true } : m));
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setMessages((prev) => prev.map(m => m.id === aiMsgId ? { ...m, content: errorMessage, isStreaming: false, error: true } : m));
     } finally {
       setIsGenerating(false);
     }
@@ -202,6 +211,11 @@ export default function ChatApp() {
         </div>
 
         <div className="flex items-center gap-4">
+          {balances && (
+            <div className="hidden lg:flex items-center gap-2 font-mono text-xs font-black uppercase tracking-widest text-[#10b981] brutal-border bg-[#ecfdf5] px-3 py-1.5 brutal-shadow-sm">
+              <Coins size={14} /> Bal: {parseFloat(balances.current_balance).toFixed(3)} / Cap: {parseFloat(balances.spending_cap).toFixed(1)} USDC
+            </div>
+          )}
           <div className="brutal-shadow brutal-border bg-[#111827] hover:bg-black transition-colors">
             <ConnectButton showBalance={false} chainStatus="icon" />
           </div>

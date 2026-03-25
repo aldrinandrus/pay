@@ -1,11 +1,11 @@
 // Cost Calculation (Pricing per 1k tokens)
 export const PRICING = {
   'gpt-4': { input: 0.03, output: 0.06 },
-  'gpt-3.5': { input: 0.0005, output: 0.0015 },
+  'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
   'claude-3-5-sonnet': { input: 0.003, output: 0.015 },
   'claude-3-opus': { input: 0.015, output: 0.075 },
   'gemini-pro': { input: 0.001, output: 0.002 },
-  'mistral': { input: 0.002, output: 0.006 },
+  'mistral-large': { input: 0.002, output: 0.006 },
 };
 
 export function estimateCost(model: string, promptText: string, maxTokens: number = 500) {

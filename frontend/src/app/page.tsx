@@ -52,6 +52,7 @@ export default function Home() {
                       <button onClick={openChainModal} type="button" className="text-white font-bold px-4 border-r-2 border-white/20 hover:bg-white/10 hidden md:flex items-center justify-center">
                         {chain?.hasIcon && chain.iconUrl && (
                           <div style={{ background: chain.iconBackground, width: 16, height: 16, borderRadius: 999, overflow: 'hidden', marginRight: 6 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img alt={chain.name ?? 'Chain'} src={chain.iconUrl} style={{ width: 16, height: 16 }} />
                           </div>
                         )}
