@@ -5,6 +5,7 @@
   "description": "x402 Payment Protocol Monorepo",
   "main": "index.js",
   "scripts": {
+    "sync-resource-url": "pnpm -C mcp sync-resource-url",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "lint:check": "turbo run lint:check",

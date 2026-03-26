@@ -6,40 +6,80 @@ This is an example client that demonstrates how to use the x402 payment protocol
 
 - Node.js v20+ (install via [nvm](https://github.com/nvm-sh/nvm))
 - pnpm v10 (install via [pnpm.io/installation](https://pnpm.io/installation))
-- A running x402 server (you can use the example express server at `examples/typescript/servers/express`)
-- A valid Ethereum private key for making payments
-- Claude Desktop with MCP support
+- **A running x402 resource server** on the URL in `RESOURCE_SERVER_URL` (default port **4021**). Use the example Hono server at `examples/typescript/servers/hono` — see step 1 below.
+- A valid Ethereum private key for making payments (Base Sepolia USDC)
+- Claude Desktop (or Cursor) with MCP support
 
 ## Setup
 
-1. Install and build all packages from the typescript examples root:
+### 1. Start the resource server (required — otherwise you get `ECONNREFUSED` on port 4021)
+
+From the **typescript examples** workspace root (`examples/typescript`):
+
 ```bash
-cd ../../
+cd servers/hono
+cp .env-local .env
+# Edit .env: set ADDRESS (pay-to), FACILITATOR_URL, NETWORK=base-sepolia
+pnpm dev
+```
+
+You should see a line like `[hono-weather] x402 resource server listening on http://127.0.0.1:4021` (or **4022** if 4021 was already in use).
+
+Hono writes the actual base URL to **`servers/hono/.resource-server-url`** on startup.
+
+### 1b. Point MCP at that URL (after Hono is up)
+
+The MCP process **automatically prefers** `servers/hono/.resource-server-url` when that file exists (written on Hono startup). That **overrides** `RESOURCE_SERVER_URL` from Cursor/Claude MCP JSON or `.env`, so a stale `http://localhost:3001` in JSON no longer breaks the tool.
+
+Optional: sync `.env` for other tools — from **`examples/typescript`**:
+
+```bash
+pnpm sync-resource-url
+```
+
+(or `cd mcp && pnpm sync-resource-url`)
+
+To **force** only `.env` / IDE vars, set **`MCP_USE_ENV_RESOURCE_URL=1`** in MCP env.
+
+To use another port: `PORT=5000 pnpm dev` then run `pnpm sync-resource-url` again.
+
+From the **mcp** folder you can also run: `pnpm resource-server` (starts the same Hono app).
+
+### 2. Install dependencies (typescript examples root)
+
+```bash
+cd ../../   # examples/typescript
 pnpm install
 pnpm build
-cd clients/mcp
+cd mcp
 ```
 
-2. Copy `.env-local` to `.env` and add your Ethereum private key:
+### 3. MCP env
+
+Copy `.env-local` to `.env` and set `PRIVATE_KEY`, then sync the resource URL (step 1b):
+
 ```bash
 cp .env-local .env
+pnpm sync-resource-url
 ```
 
-3. Configure Claude Desktop MCP settings:
+Use `http://127.0.0.1` (not `localhost`) on Windows if you still see connection errors.
+
+### 4. Configure Claude Desktop / Cursor MCP settings
+
 ```json
 {
   "mcpServers": {
-    "demo": {
+    "x402-weather": {
       "command": "pnpm",
       "args": [
         "--silent",
         "-C",
-        "<absolute path to this repo>/examples/typescript/mcp",
+        "<absolute path>/x402_mcp_claude/examples/typescript/mcp",
         "dev"
       ],
       "env": {
-        "PRIVATE_KEY": "<private key of a wallet with USDC on Base Sepolia>",
-        "RESOURCE_SERVER_URL": "http://localhost:4021",
+        "PRIVATE_KEY": "<private key — wallet with Base Sepolia USDC>",
         "ENDPOINT_PATH": "/weather"
       }
     }
@@ -47,7 +87,10 @@ cp .env-local .env
 }
 ```
 
-4. Start the example client (remember to be running a server or pointing to one in the .env file):
+**`RESOURCE_SERVER_URL` in JSON is optional:** if **`servers/hono/.resource-server-url`** exists, the MCP server uses it and **ignores** a wrong URL in JSON (see stderr on startup). Use **`MCP_USE_ENV_RESOURCE_URL=1`** only if you must force JSON/`.env` values.
+
+### 5. Run the MCP server (or let the IDE start it via the config above)
+
 ```bash
 pnpm dev
 ```
@@ -89,7 +132,7 @@ const server = new McpServer({
 
 // Add tool for making paid requests
 server.tool("get-data-from-resource-server", "Get data from the resource server (in this example, the weather)",  {}, async () => {
-  const res = await client.post(`${ENDPOINT_PATH}`);
+  const res = await client.get(`${ENDPOINT_PATH}`);
   return {
     content: [{ type: "text", text: JSON.stringify(res.data) }],
   };
